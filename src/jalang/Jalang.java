@@ -5,6 +5,9 @@ import java.util.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+
+import static jalang.TokenType.EOF;
+
 public class Jalang {
     static boolean hadError = false;
     public static void main(String[] args) throws IOException {
@@ -38,13 +41,22 @@ public class Jalang {
     private static void run(String source) {
         Scanner sc = new Scanner(source);
         List<Token> tokens = sc.scanTokens();
-        for(Token t: tokens){
-            System.out.println(t);
-        }
+        Parser parser = new Parser(tokens);
+        Expr expression = parser.parse();
+        if(hadError)return;
+        System.out.println(new AstPrinter().print(expression));
     }
     static void error(int line, String message){
         report(line, " ",message);
     }
+    static void error(Token token, String message){
+        if(token.type == EOF){
+            report(token.line, "at end",message);
+        }else{
+            report(token.line, "at '"+ token.lexeme +"'",message);
+        }
+    }
+
     private static void report(int line, String where, String message){
         System.out.println("[line "+ line + "] Error "+ where + ": "+message);
         hadError = true;

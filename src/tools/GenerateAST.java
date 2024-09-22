@@ -10,12 +10,18 @@ public class GenerateAST {
 //            System.err.println("Usage: generate_ast <output_directory>");
 //            System.exit(64);
 //        }
-        String outDir = "/Users/rohinjoshi/Work/codes/Jalang/src/jalang";
+        String outDir = "/Users/rohinjoshi/Work/codes/Jalang/src/jasper/";
         defineAst(outDir, "Expr", Arrays.asList(
                 "Binary   : Expr left, Token operator, Expr right",
                 "Grouping : Expr expression",
                 "Literal  : Object value",
-                "Unary    : Token operator, Expr right"
+                "Unary    : Token operator, Expr right",
+                "Variable : Token name"
+        ));
+        defineAst(outDir, "Stmt", Arrays.asList(
+                "Expression : Expr expression",
+                "Print      : Expr expression",
+                "Var        : Token name, Expr initializer"
         ));
     }
     private static void defineAst(

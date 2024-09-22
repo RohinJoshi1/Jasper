@@ -1,7 +1,7 @@
-package jalang;
+package jasper;
 import java.util.*;
 
-import static jalang.TokenType.*;
+import static jasper.TokenType.*;
 
 public class Scanner {
     private static final Map<String, TokenType> keywords;
@@ -76,12 +76,15 @@ public class Scanner {
             case '=':
                 addToken(match('=') ? EQUAL_EQUAL : EQUAL);
                 break;
-            //Comment using # instead of //
             case '#':
-                while(peek(0) != '\n' && !isAtEnd())advance();
+                while(peek(0)!='\n' && !isAtEnd())advance();
                 break;
             case '/':
-                addToken(SLASH);
+                if (match('/')) {
+                    while (peek(0) != '\n' && !isAtEnd()) advance();
+                } else {
+                    addToken(SLASH);
+                }
                 break;
             case '|':
                 //Maximal munch , so this would work for both | and ||
@@ -90,6 +93,8 @@ public class Scanner {
             case '&':
                 addToken(AND);
                 break;
+            case '\\':
+
             case ' ':
             case '\r':
             case '\t':
@@ -150,12 +155,17 @@ public class Scanner {
             if(peek(0) == '\n')line++;
             advance();
         }
+        boolean error = false;
         if(isAtEnd()){
             Jalang.error(line, "Unterminated String");
+            error = true;
         }
-        advance();
-        String val = source.substring(start+1,current-1);
-        addToken(STRING, val);
+        if(!error){
+            advance();
+            String val = source.substring(start+1,current-1);
+            addToken(STRING, val);
+        }
+
     }
     private char peek(int offset){
         if(current + offset >= source.length())return '\0';

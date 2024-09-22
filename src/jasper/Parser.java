@@ -1,8 +1,7 @@
-package jalang;
+package jasper;
 import java.util.*;
-import  jalang.*;
 
-import static jalang.TokenType.*;
+import static jasper.TokenType.*;
 
 /*
 * GRAMMAR RULES
@@ -14,7 +13,13 @@ factor         → unary ( ( "/" | "*" ) unary )* ;
 unary          → ( "!" | "-" ) unary
                | primary ;
 primary        → NUMBER | STRING | "true" | "false" | "nil"
-               | "(" expression ")" ;
+               | "(" expression ")" | IDENTIFIER;
+program -> (declaration)* EOF;
+* declaration -> varDecl | statement;
+* statement -> (printStmt | expressionStmt);
+* exprStmt -> expression ";" ;
+* printStmt -> "print" expression ";" ;
+* varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 */
 public class Parser {
     static class ParseError extends RuntimeException{}
@@ -23,17 +28,53 @@ public class Parser {
     Parser(List<Token> tokens){
         this.tokens = tokens;
     }
-    Expr parse(){
+    List<Stmt> parse() {
+        List<Stmt> statements = new ArrayList<>();
+        while (!isAtEnd()) {
+            statements.add(declaration());
+        }
+
+        return statements;
+    }
+    private Stmt declaration(){
         try{
-            return expression();
-        }catch (ParseError error){
+            if(match(VAR))return varDeclaration();
+            return statement();
+        }catch (ParseError e){
+            synchronize();
             return null;
         }
     }
+    private Stmt varDeclaration(){
+        Token name = consume(IDENTIFIER,"Variable name not provided");
+        Expr equals = null;
+        if(match(EQUAL)){
+            equals = expression();
+        }
+        consume(SEMICOLON, "Expect ; after variable declaration");
+        return new Stmt.Var(name, equals);
+    }
 
-     private Expr expression(){
+
+    private Expr expression(){
         return equality();
      }
+     private Stmt statement(){
+        if(match(PRINT)) return printStatement();
+        return expressionStatement();
+     }
+     private Stmt printStatement(){
+        Expr value = expression();
+        consume(SEMICOLON, "Expect ';' after value.");
+        return new Stmt.Print(value);
+     }
+     private Stmt expressionStatement(){
+        Expr expr = expression();
+        System.out.println(expr);
+        consume(SEMICOLON, "Expect ';' after value.");
+        return new Stmt.Expression(expr);
+     }
+
     //comparison( ("!=" | "==")) comp)*
     private Expr equality(){
         Expr expr = comparison();
@@ -91,7 +132,7 @@ public class Parser {
         if(match(FALSE)) return  new Expr.Literal(false);
         if(match(TRUE)) return  new Expr.Literal(true);
         if(match(NIL)) return  new Expr.Literal(null);
-
+        if(match(IDENTIFIER))return new Expr.Variable(previous());
         if(match(LEFT_PAREN)){
             Expr expr = expression();
             consume(RIGHT_PAREN, "Expect ')' after expression");
@@ -102,7 +143,8 @@ public class Parser {
 
     private Token consume(TokenType tokenType, String message) {
         if (check(tokenType)) advance();
-        throw error(peek(), message);
+        else throw error(peek(), message);
+        return null;
     }
     private ParseError error(Token token, String message){
         Jalang.error(token,message);

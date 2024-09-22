@@ -1,4 +1,4 @@
-package jalang;
+package jasper;
 
 public class Token {
     final TokenType type;

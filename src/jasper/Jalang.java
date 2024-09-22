@@ -1,4 +1,4 @@
-package jalang;
+package jasper;
 import java.io.IOException;
 import java.io.*;
 import java.util.*;
@@ -6,10 +6,12 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
-import static jalang.TokenType.EOF;
+import static jasper.TokenType.EOF;
 
 public class Jalang {
+    private static final Interpreter interpreter = new Interpreter();
     static boolean hadError = false;
+    static boolean hadRuntimeError = false;
     public static void main(String[] args) throws IOException {
         if(args.length > 1){
             System.out.println("Usage: Jalang [script]");
@@ -25,6 +27,7 @@ public class Jalang {
         byte[] bytes = Files.readAllBytes(Paths.get(path));
         run(new String(bytes, Charset.defaultCharset()));
         if(hadError)System.exit(64);
+        if (hadRuntimeError) System.exit(70);
     }
     private static void runPrompt() throws IOException {
         InputStreamReader input = new InputStreamReader(System.in);
@@ -42,9 +45,10 @@ public class Jalang {
         Scanner sc = new Scanner(source);
         List<Token> tokens = sc.scanTokens();
         Parser parser = new Parser(tokens);
-        Expr expression = parser.parse();
+        List<Stmt> expression = parser.parse();
         if(hadError)return;
-        System.out.println(new AstPrinter().print(expression));
+        interpreter.interpret(expression);
+//        System.out.println(new AstPrinter().print(expression));
     }
     static void error(int line, String message){
         report(line, " ",message);
@@ -60,5 +64,9 @@ public class Jalang {
     private static void report(int line, String where, String message){
         System.out.println("[line "+ line + "] Error "+ where + ": "+message);
         hadError = true;
+    }
+    static void runtimeError(RuntimeError e){
+        System.err.println(e.getMessage() + "\n[line" + e.token.line + "]");
+        hadRuntimeError= true;
     }
 }

@@ -44,6 +44,9 @@ public class Jalang {
     private static void run(String source) {
         Scanner sc = new Scanner(source);
         List<Token> tokens = sc.scanTokens();
+//        for(Token t : tokens){
+//            System.out.println(t.type);
+//        }
         Parser parser = new Parser(tokens);
         List<Stmt> expression = parser.parse();
         if(hadError)return;

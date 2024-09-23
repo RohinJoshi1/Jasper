@@ -12,6 +12,7 @@ public class GenerateAST {
 //        }
         String outDir = "/Users/rohinjoshi/Work/codes/Jalang/src/jasper/";
         defineAst(outDir, "Expr", Arrays.asList(
+                "Assign : Token name, Expr value",
                 "Binary   : Expr left, Token operator, Expr right",
                 "Grouping : Expr expression",
                 "Literal  : Object value",
@@ -19,6 +20,7 @@ public class GenerateAST {
                 "Variable : Token name"
         ));
         defineAst(outDir, "Stmt", Arrays.asList(
+                "Block: List<Stmt> statements",
                 "Expression : Expr expression",
                 "Print      : Expr expression",
                 "Var        : Token name, Expr initializer"
@@ -29,7 +31,7 @@ public class GenerateAST {
     ) throws IOException{
         String path = outDir + "/" + baseName + ".java";
         PrintWriter pw = new PrintWriter(path, "UTF-8");
-        pw.println("package jalang;");
+        pw.println("package jasper;");
         pw.println();
         pw.println("import java.util.*;");
         pw.println();

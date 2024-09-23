@@ -5,7 +5,8 @@ import static jasper.TokenType.*;
 
 /*
 * GRAMMAR RULES
-* expression     → equality ;
+* expression -> assignment;
+* assignment    →  IDENTIFIER "=" assignment |equality ;
 equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           → factor ( ( "-" | "+" ) factor )* ;
@@ -16,7 +17,8 @@ primary        → NUMBER | STRING | "true" | "false" | "nil"
                | "(" expression ")" | IDENTIFIER;
 program -> (declaration)* EOF;
 * declaration -> varDecl | statement;
-* statement -> (printStmt | expressionStmt);
+* statement -> (printStmt | expressionStmt | block);
+* block -> "{" declaration* "}";
 * exprStmt -> expression ";" ;
 * printStmt -> "print" expression ";" ;
 * varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
@@ -45,23 +47,48 @@ public class Parser {
             return null;
         }
     }
-    private Stmt varDeclaration(){
-        Token name = consume(IDENTIFIER,"Variable name not provided");
-        Expr equals = null;
-        if(match(EQUAL)){
-            equals = expression();
+    private Stmt varDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect variable name.");
+
+        Expr initializer = null;
+        if (match(EQUAL)) {
+            initializer = expression();
         }
-        consume(SEMICOLON, "Expect ; after variable declaration");
-        return new Stmt.Var(name, equals);
+
+        consume(SEMICOLON, "Expect ';' after variable declaration.");
+        return new Stmt.Var(name, initializer);
     }
 
 
     private Expr expression(){
-        return equality();
+        return assignment();
      }
+     private Expr assignment(){
+        Expr expr = equality();
+        if(match(EQUAL)){
+            Token equals = previous();
+            Expr value = assignment();
+            if (expr instanceof Expr.Variable){
+                Token name = ((Expr.Variable)expr).name;
+                return new Expr.Assign(name, value);
+            }
+            ParseError error = error(equals, "Invalid assignment target.");
+        }
+        return  expr;
+     }
+
      private Stmt statement(){
         if(match(PRINT)) return printStatement();
+        if(match(LEFT_BRACE)) return new Stmt.Block(block());
         return expressionStatement();
+     }
+     private List<Stmt> block(){
+        List<Stmt> stmts = new ArrayList<>();
+        while(!check(RIGHT_BRACE) && !isAtEnd()){
+            stmts.add(declaration());
+        }
+        consume(RIGHT_BRACE,"Expect '}' after block");
+        return stmts;
      }
      private Stmt printStatement(){
         Expr value = expression();
@@ -142,9 +169,11 @@ public class Parser {
     }
 
     private Token consume(TokenType tokenType, String message) {
-        if (check(tokenType)) advance();
+        if (check(tokenType)) {
+            return advance();
+        }
         else throw error(peek(), message);
-        return null;
+//        return null;
     }
     private ParseError error(Token token, String message){
         Jalang.error(token,message);

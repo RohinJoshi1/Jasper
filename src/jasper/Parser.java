@@ -1,4 +1,5 @@
 package jasper;
+import java.rmi.server.RemoteObjectInvocationHandler;
 import java.util.*;
 
 import static jasper.TokenType.*;
@@ -7,6 +8,8 @@ import static jasper.TokenType.*;
 * GRAMMAR RULES
 * expression -> assignment;
 * assignment    →  IDENTIFIER "=" assignment |equality ;
+* OR -> AND ( "or" AND)*;
+* AND -> EQUALITY ("AND" EQUALITY)*;
 equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           → factor ( ( "-" | "+" ) factor )* ;
@@ -17,7 +20,13 @@ primary        → NUMBER | STRING | "true" | "false" | "nil"
                | "(" expression ")" | IDENTIFIER;
 program -> (declaration)* EOF;
 * declaration -> varDecl | statement;
-* statement -> (printStmt | expressionStmt | block);
+* statement -> (printStmt | ifStmt | expressionStmt | block | whileStmt | forStmt);
+* forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
+                 expression? ";"
+                 expression? ")" statement ;
+* whileStmt      → "while" "(" expression ")" statement ;
+* ifStmt -> "if" "(" expression ")" statement
+*   ("else" statement)?;
 * block -> "{" declaration* "}";
 * exprStmt -> expression ";" ;
 * printStmt -> "print" expression ";" ;
@@ -64,7 +73,8 @@ public class Parser {
         return assignment();
      }
      private Expr assignment(){
-        Expr expr = equality();
+        Expr expr = or();
+//        Expr expr = equality();
         if(match(EQUAL)){
             Token equals = previous();
             Expr value = assignment();
@@ -76,11 +86,82 @@ public class Parser {
         }
         return  expr;
      }
-
+     // AND ("OR AND")*
+     private Expr or(){
+        Expr expr = and();
+        while(match(OR)){
+            Token operator = previous();
+            Expr right = and();
+            expr = new Expr.Logical(expr, operator , right);
+        }
+        return expr;
+     }
+     private Expr and(){
+        Expr expr = equality();
+        while(match(AND)){
+            Token operator = previous();
+            Expr right = equality();
+            expr = new Expr.Logical(expr, operator, right);
+        }
+        return expr;
+     }
      private Stmt statement(){
         if(match(PRINT)) return printStatement();
+        if(match(IF))return ifStatement();
+        if(match(WHILE))return whileStatement();
+        if(match(FOR))return forStatement();
         if(match(LEFT_BRACE)) return new Stmt.Block(block());
         return expressionStatement();
+     }
+//     for(int x=0;condition; x++);
+     private Stmt forStatement(){
+        consume(LEFT_PAREN, "Expect ( after for");
+        Stmt initializer;
+        if(match(SEMICOLON)){
+            initializer = null;
+        }else if(match(VAR)){
+            initializer = varDeclaration();
+        }else{
+            initializer = expressionStatement();
+        }
+        Expr condition=null;
+        if(!check(SEMICOLON)){
+            condition = expression();
+        }
+        consume(SEMICOLON, " Expect ; after for condition");
+        Expr increment = null;
+        if(!check(RIGHT_PAREN)){
+            increment = expression();
+        }
+        consume(RIGHT_PAREN, "Expect ) after for clauses");
+        Stmt body = statement();
+        if(increment!=null){
+            body = new Stmt.Block(Arrays.asList(body, new Stmt.Expression(increment)));
+        }
+        if(condition == null)condition = new Expr.Literal(true);
+        body = new Stmt.While(condition, body);
+        if(initializer!= null){
+            body = new Stmt.Block(Arrays.asList(initializer, body));
+        }
+        return body;
+     }
+     private Stmt whileStatement(){
+        consume(LEFT_PAREN, "Expected ( after while keyword");
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expected ) after condition");
+        Stmt body = statement();
+        return  new Stmt.While(condition, body);
+     }
+     private Stmt ifStatement(){
+        consume(LEFT_PAREN,"Expected ( after if");
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expected ) after condition");
+        Stmt then = statement();
+        Stmt else_ = null;
+        if(match(ELSE)){
+            else_ = statement();
+        }
+        return new Stmt.If(condition, then, else_);
      }
      private List<Stmt> block(){
         List<Stmt> stmts = new ArrayList<>();

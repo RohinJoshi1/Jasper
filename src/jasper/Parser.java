@@ -14,13 +14,17 @@ equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           → factor ( ( "-" | "+" ) factor )* ;
 factor         → unary ( ( "/" | "*" ) unary )* ;
-unary          → ( "!" | "-" ) unary
-               | primary ;
+unary          → ( "!" | "-" ) unary | call;
+call           -> primary ( "(" args ? ")" ) *
+args -> expression ( "," expression)*;
 primary        → NUMBER | STRING | "true" | "false" | "nil"
                | "(" expression ")" | IDENTIFIER;
 program -> (declaration)* EOF;
-* declaration -> varDecl | statement;
-* statement -> (printStmt | ifStmt | expressionStmt | block | whileStmt | forStmt);
+* declaration -> varDecl | statement | funcDecl;
+* funcDecl        → "fun" function ;
+function       → IDENTIFIER "(" parameters? ")" block ;
+* statement -> (printStmt | ifStmt | expressionStmt | block | whileStmt | forStmt | returnStmt);
+* returnStmt -> "return" expression? ";" ;
 * forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
                  expression? ";"
                  expression? ")" statement ;
@@ -49,6 +53,7 @@ public class Parser {
     }
     private Stmt declaration(){
         try{
+            if(match(FUNC))return function("function");
             if(match(VAR))return varDeclaration();
             return statement();
         }catch (ParseError e){
@@ -56,6 +61,22 @@ public class Parser {
             return null;
         }
     }
+    private Stmt function(String kind){
+        Token name = consume(IDENTIFIER, "Expect " + kind + "name");
+        //Get params
+        consume(LEFT_PAREN, "Expect '(' after "+ kind + "name");
+        List<Token> params = new ArrayList<>();
+        if(!check(RIGHT_PAREN)){
+            do{
+                params.add(consume(IDENTIFIER, "Expect param name"));
+            }while(match(COMMA));
+        }
+        consume(RIGHT_PAREN, "Expect ')' after parameters");
+        consume(LEFT_BRACE, "Function body needs to be enclosed within { <body >}");
+        List<Stmt> body = block();
+        return new Stmt.Function(name, params, body);
+    }
+
     private Stmt varDeclaration() {
         Token name = consume(IDENTIFIER, "Expect variable name.");
 
@@ -107,11 +128,21 @@ public class Parser {
      }
      private Stmt statement(){
         if(match(PRINT)) return printStatement();
+        if(match(RETURN))return returnStmt();
         if(match(IF))return ifStatement();
         if(match(WHILE))return whileStatement();
         if(match(FOR))return forStatement();
         if(match(LEFT_BRACE)) return new Stmt.Block(block());
         return expressionStatement();
+     }
+     private Stmt returnStmt(){
+        Token keyword = previous();
+        Expr val = null;
+        if(!check(SEMICOLON)){
+            val = expression();
+        }
+        consume(SEMICOLON, "Expected ; after return statement");
+        return new Stmt.Return(keyword, val);
      }
 //     for(int x=0;condition; x++);
      private Stmt forStatement(){
@@ -229,8 +260,32 @@ public class Parser {
             Token operation = previous();
             return new Expr.Unary(operation, unary());
         }
-        return primary();
+        return call();
     }
+    //call           -> primary ( "(" args ? ")" ) *
+    //args -> expression ( "," expression)*;
+    private Expr call(){
+        Expr expr = primary();
+        while(true){
+            if(match(LEFT_PAREN)){
+                expr = processCall(expr);
+            }else break;
+        }
+        return  expr;
+    }
+
+    private  Expr processCall(Expr callee){
+        List<Expr> arguments = new ArrayList<>();
+        if(!check(RIGHT_PAREN)){
+            do{
+                //Maybe add an argument limit like java? 255? to simplify bytecode, Skipping this cuz meh
+                arguments.add(expression());
+            }while(match(COMMA));
+        }
+        Token paren = consume(RIGHT_PAREN, "Expected ')' after function arguments");
+        return new Expr.Call(callee, paren, arguments);
+    }
+
     //primary        → NUMBER | STRING | "true" | "false" | "nil"
     //               | "(" expression ")" ;
     private Expr primary(){
@@ -257,7 +312,7 @@ public class Parser {
 //        return null;
     }
     private ParseError error(Token token, String message){
-        Jalang.error(token,message);
+        Jasper.error(token,message);
         return new ParseError();
     }
     private  void synchronize(){
@@ -266,7 +321,7 @@ public class Parser {
             if(previous().type == SEMICOLON)return;
             switch (peek().type){
                 case CLASS:
-                case FUN:
+                case FUNC:
                 case VAR:
                 case FOR:
                 case IF:
@@ -278,6 +333,7 @@ public class Parser {
             advance();
         }
     }
+
     private boolean match(TokenType ...types){
         for(TokenType type : types){
             if(check(type)){

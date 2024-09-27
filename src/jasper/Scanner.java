@@ -13,7 +13,7 @@ public class Scanner {
         keywords.put("else",   ELSE);
         keywords.put("false",  FALSE);
         keywords.put("for",    FOR);
-        keywords.put("fun",    FUN);
+        keywords.put("func",    FUNC);
         keywords.put("if",     IF);
         keywords.put("nil",    NIL);
         keywords.put("or",     OR);
@@ -119,7 +119,7 @@ public class Scanner {
                 }else if (isAlpha(c)) {
                     identifier();
                 }
-                else Jalang.error(line, "Unexpected token");break;
+                else Jasper.error(line, "Unexpected token");break;
         }
     }
     private void identifier() {
@@ -157,7 +157,7 @@ public class Scanner {
         }
         boolean error = false;
         if(isAtEnd()){
-            Jalang.error(line, "Unterminated String");
+            Jasper.error(line, "Unterminated String");
             error = true;
         }
         if(!error){

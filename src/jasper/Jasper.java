@@ -8,13 +8,13 @@ import java.nio.file.Paths;
 
 import static jasper.TokenType.EOF;
 
-public class Jalang {
+public class Jasper {
     private static final Interpreter interpreter = new Interpreter();
     static boolean hadError = false;
     static boolean hadRuntimeError = false;
     public static void main(String[] args) throws IOException {
         if(args.length > 1){
-            System.out.println("Usage: Jalang [script]");
+            System.out.println("Usage: Jasper [script]");
             System.exit(64);
         }else if(args.length == 1){
             run(args[0]);

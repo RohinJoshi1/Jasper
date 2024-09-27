@@ -1,10 +1,113 @@
 package jasper;
 
+import java.io.*;
 import java.sql.Statement;
 import java.util.*;
 
 public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
-    private Environment environment = new Environment();
+    static final Environment globals = new Environment();
+    private Environment environment = globals;
+    Interpreter(){
+        globals.define("clock", new JasperCallable() {
+
+            @Override
+            public int arity() {
+                return 0;
+            }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                return (double)System.currentTimeMillis()/1000;
+            }
+
+            @Override
+            public String toString() { return "<native fn>"; }
+        });
+        globals.define("printf", new JasperCallable() {
+            @Override
+            public int arity() {
+                return -1; // Variable number of arguments
+            }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                if (arguments.isEmpty()) {
+                    System.out.println();
+                    return  null;
+                }
+                String format = (String) arguments.getFirst();
+                Object[] args = arguments.subList(1, arguments.size()).toArray();
+                System.out.printf(format, args);
+                return null;
+            }
+        });
+        // Updated input function
+        globals.define("input", new JasperCallable() {
+            @Override
+            public int arity() { return 0; }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                try {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+                    return reader.readLine();
+                } catch (IOException e) {
+                    throw new RuntimeError(null, "Failed to read input: " + e.getMessage());
+                }
+            }
+        });
+
+        // Updated file_read function
+        globals.define("file_read", new JasperCallable() {
+            @Override
+            public int arity() { return 1; }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                if (arguments.size() != 1 || !(arguments.get(0) instanceof String)) {
+                    throw new RuntimeError(null, "file_read expects a single string argument (file path).");
+                }
+                String filePath = (String) arguments.get(0);
+                try {
+                    StringBuilder content = new StringBuilder();
+                    BufferedReader reader = new BufferedReader(new FileReader(filePath));
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        content.append(line).append("\n");
+                    }
+                    reader.close();
+                    return content.toString();
+                } catch (IOException e) {
+                    throw new RuntimeError(null, "Failed to read file: " + e.getMessage());
+                }
+            }
+        });
+
+        // Updated file_write function
+        globals.define("file_write", new JasperCallable() {
+            @Override
+            public int arity() { return 2; }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                if (arguments.size() != 2 || !(arguments.get(0) instanceof String) || !(arguments.get(1) instanceof String)) {
+                    throw new RuntimeError(null, "file_write expects two string arguments (file path and content).");
+                }
+                String filePath = (String) arguments.get(0);
+                String content = (String) arguments.get(1);
+                try {
+                    BufferedWriter writer = new BufferedWriter(new FileWriter(filePath));
+                    writer.write(content);
+                    writer.close();
+                    return null;
+                } catch (IOException e) {
+                    throw new RuntimeError(null, "Failed to write to file: " + e.getMessage());
+                }
+            }
+        });
+    }
+
+
 
     @Override
     public Object visitAssignExpr(Expr.Assign expr) {
@@ -55,6 +158,29 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
                 return !isEqual(left, right);
         }
         return null;
+    }
+
+    @Override
+    public Object visitCallExpr(Expr.Call expr) {
+        Object callee = evaluate(expr.callee);
+        List<Object> args = new ArrayList<>();
+        for(Expr a : expr.arguments){
+            args.add(evaluate(a));
+        }
+
+        if(!(callee instanceof JasperCallable)){
+            throw new RuntimeError(expr.paren, "Can only call functions and classes");
+        }
+        JasperCallable function = (JasperCallable)callee;
+        int arity = function.arity();
+        if(args.size() != arity){
+            throw new RuntimeError(expr.paren, "Expected "+ arity +"  arguments, got "+args.size());
+        }
+        return  function.call(this, args);
+
+        //I need to check if len(args) == expected_len
+
+
     }
 
     private boolean isEqual(Object a, Object b) {
@@ -148,7 +274,7 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
                 execute(token);
             }
         } catch (RuntimeError e) {
-            Jalang.runtimeError(e);
+            Jasper.runtimeError(e);
         }
     }
 
@@ -168,17 +294,26 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
             this.environment = environment;
             for(Stmt s : stmts){
                 execute(s);
-            }
+            }}
+        catch(Return returnvalue){
+                throw returnvalue;
         }finally {
             this.environment = prev;
         }
-
     }
 
     @Override
     public Void visitExpressionStmt(Stmt.Expression stmt) {
         evaluate(stmt.expression);
         return null;
+    }
+
+    @Override
+    public Void visitFunctionStmt(Stmt.Function stmt) {
+        Function func = new Function(stmt,environment);
+        environment.define(stmt.name.lexeme, func);
+        return null;
+
     }
 
     @Override
@@ -197,6 +332,13 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
         Object value = evaluate(stmt.expression);
         System.out.println(stringify(value));
         return null;
+    }
+
+    @Override
+    public Void visitReturnStmt(Stmt.Return stmt) {
+        Object val = null;
+        if(stmt.value != null) val = evaluate(stmt.value);
+        throw new Return(val);
     }
 
     @Override

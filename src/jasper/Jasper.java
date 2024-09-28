@@ -13,8 +13,12 @@ public class Jasper {
     static boolean hadError = false;
     static boolean hadRuntimeError = false;
     public static void main(String[] args) throws IOException {
-        if(args.length > 1){
+        if(args.length > 2){
             System.out.println("Usage: Jasper [script]");
+            return;
+        }
+        if(args.length > 1){
+            runFile(args[1]);
             System.exit(64);
         }else if(args.length == 1){
             run(args[0]);
@@ -44,14 +48,14 @@ public class Jasper {
     private static void run(String source) {
         Scanner sc = new Scanner(source);
         List<Token> tokens = sc.scanTokens();
-//        for(Token t : tokens){
-//            System.out.println(t.type);
-//        }
         Parser parser = new Parser(tokens);
-        List<Stmt> expression = parser.parse();
+        List<Stmt> statements = parser.parse();
         if(hadError)return;
-        interpreter.interpret(expression);
-//        System.out.println(new AstPrinter().print(expression));
+        Resolver resolver = new Resolver(interpreter);
+        resolver.resolve(statements);
+        if(hadError)return;
+        interpreter.interpret(statements);
+
     }
     static void error(int line, String message){
         report(line, " ",message);

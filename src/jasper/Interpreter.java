@@ -7,6 +7,8 @@ import java.util.*;
 public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
     static final Environment globals = new Environment();
     private Environment environment = globals;
+    private final Map<Expr, Integer> locals = new HashMap<>();
+
     Interpreter(){
         globals.define("clock", new JasperCallable() {
 
@@ -107,12 +109,19 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
         });
     }
 
-
+    void resolve(Expr expr, int depth){
+        locals.put(expr,depth);
+    }
 
     @Override
     public Object visitAssignExpr(Expr.Assign expr) {
         Object value = evaluate(expr.value);
-        environment.assign(expr.name, value);
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            environment.assignAt(distance, expr.name, value);
+        } else {
+            globals.assign(expr.name, value);
+        }
         return value;
     }
 
@@ -173,7 +182,7 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
         }
         JasperCallable function = (JasperCallable)callee;
         int arity = function.arity();
-        if(args.size() != arity){
+        if(arity!=-1 && args.size() != arity){
             throw new RuntimeError(expr.paren, "Expected "+ arity +"  arguments, got "+args.size());
         }
         return  function.call(this, args);
@@ -242,8 +251,17 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
 
     @Override
     public Object visitVariableExpr(Expr.Variable expr) {
-        return environment.get(expr.name);
+
+        return lookUpVariable(expr.name, expr);
     }
+    private Object lookUpVariable(Token name, Expr expr){
+        Integer dist = locals.get(expr);
+        if(dist!= null){
+            return environment.getAt(dist, name.lexeme);
+        }
+        return globals.get(name);
+    }
+
 
     private boolean isTruth(Object obj) {
         return switch (obj) {

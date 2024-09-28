@@ -209,7 +209,6 @@ public class Parser {
      }
      private Stmt expressionStatement(){
         Expr expr = expression();
-        System.out.println(expr);
         consume(SEMICOLON, "Expect ';' after value.");
         return new Stmt.Expression(expr);
      }

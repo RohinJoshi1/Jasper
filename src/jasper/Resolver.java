@@ -41,7 +41,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         declare(stmt.name);
         define(stmt.name);
         beginScope();
-        scopes.peek().put("this",true);
+        scopes.peek().put("this", true);
         for(Stmt.Function method : stmt.methods){
             FunctionType declaration = FunctionType.METHOD;
             if (method.name.lexeme.equals("init")) {
@@ -65,7 +65,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         FunctionType enclosingFunction = currentFunction;
         currentFunction = type;
         beginScope();
-        for(Token param : function.params){
+        for(Token param : function.parameters){
             declare(param);
             define(param);
         }

@@ -1,12 +1,9 @@
 package jasper;
-
-import javax.management.RuntimeErrorException;
 import java.io.*;
-import java.sql.Statement;
 import java.util.*;
 
 public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
-    static final Environment globals = new Environment();
+    final Environment globals = new Environment();
     private Environment environment = globals;
     private final Map<Expr, Integer> locals = new HashMap<>();
 
@@ -110,216 +107,13 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
         });
     }
 
-    void resolve(Expr expr, int depth){
-        locals.put(expr,depth);
-    }
-
-    @Override
-    public Object visitAssignExpr(Expr.Assign expr) {
-        Object value = evaluate(expr.value);
-        Integer distance = locals.get(expr);
-        if (distance != null) {
-            environment.assignAt(distance, expr.name, value);
-        } else {
-            globals.assign(expr.name, value);
-        }
-        return value;
-    }
-
-    @Override
-    public Object visitBinaryExpr(Expr.Binary expr) {
-        Object left = evaluate(expr.left);
-        Object right = evaluate(expr.right);
-        switch (expr.operator.type) {
-            case MINUS:
-                NumberCheck(expr.operator, left, right);
-                return (double) left - (double) right;
-            case SLASH:
-                NumberCheck(expr.operator, left, right);
-                return (double) left / (double) right;
-            case STAR:
-                NumberCheck(expr.operator, left, right);
-                return (double) left * (double) right;
-            //+ : Integers , Strings ++ -> i +1
-            case PLUS:
-                if (left instanceof Double && right instanceof Double) {
-                    return (double) left + (double) right;
-                }
-                if (left instanceof String && right instanceof String) {
-                    return (String) left + (String) right;
-                }
-                throw new RuntimeError(expr.operator,
-                        "Operands must be two numbers or two strings.");
-            case GREATER:
-                NumberCheck(expr.operator, left, right);
-                return (double) left > (double) right;
-            case GREATER_EQUAL:
-                NumberCheck(expr.operator, left, right);
-                return (double) left >= (double) right;
-            case LESS:
-                NumberCheck(expr.operator, left, right);
-                return (double) left < (double) right;
-            case LESS_EQUAL:
-                NumberCheck(expr.operator, left, right);
-                return (double) left <= (double) right;
-            case EQUAL_EQUAL:
-                return isEqual(left, right);
-            case BANG_EQUAL:
-                return !isEqual(left, right);
-        }
-        return null;
-    }
-
-    @Override
-    public Object visitCallExpr(Expr.Call expr) {
-        Object callee = evaluate(expr.callee);
-        List<Object> args = new ArrayList<>();
-        for(Expr a : expr.arguments){
-            args.add(evaluate(a));
-        }
-
-        if(!(callee instanceof JasperCallable)){
-            throw new RuntimeError(expr.paren, "Can only call functions and classes");
-        }
-        JasperCallable function = (JasperCallable)callee;
-        int arity = function.arity();
-        if(arity!=-1 && args.size() != arity){
-            throw new RuntimeError(expr.paren, "Expected "+ arity +"  arguments, got "+args.size());
-        }
-        return  function.call(this, args);
-
-        //I need to check if len(args) == expected_len
-
-
-    }
-
-    @Override
-    public Object visitGetExpr(Expr.Get expr) {
-        Object object = evaluate(expr.object);
-        if((object instanceof Instance)){
-           return ((Instance)object).get(expr.name);
-        }
-        throw new RuntimeError(expr.name, " Only instances have properties");
-    }
-
-    @Override
-    public Object visitSetExpr(Expr.Set expr) {
-        Object object = evaluate(expr.object);
-        if(!(object instanceof Instance)){
-            throw new RuntimeError(expr.name, "Only instances have fields");
-        }
-        Object value = evaluate(expr.value);
-        ((Instance)object).set(expr.name, value);
-        return value;
-
-    }
-
-    @Override
-    public Object visitThisExpr(Expr.This expr) {
-        return lookUpVariable(expr.keyword, expr);
-    }
-
-    private boolean isEqual(Object a, Object b) {
-        if (a == null && b == null) return true;
-        if (a == null) return false;
-
-        return a.equals(b);
-    }
-
-    void NumberCheck(Token t, Object... operands) {
-        for (Object o : operands) {
-            if (!(o instanceof Double)) {
-                throw new RuntimeError(t, "Operand must be a number");
-            }
-        }
-        return;
-
-    }
-
-    @Override
-    public Object visitGroupingExpr(Expr.Grouping expr) {
-        return evaluate(expr.expression);
-    }
-
-    private Object evaluate(Expr expr) {
-        return expr.accept(this);
-    }
-
-    @Override
-    public Object visitLiteralExpr(Expr.Literal expr) {
-        return expr.value;
-    }
-
-    @Override
-    public Object visitLogicalExpr(Expr.Logical expr) {
-        Object left = evaluate(expr.left);
-        if(expr.operator.type == TokenType.OR){
-            if(isTruth(left))return left; // short circuit OR
-        }else{
-            if(!isTruth(left))return left; //Short circuit AND
-        }
-        return evaluate(expr.right);
-    }
-
-
-    @Override
-    public Object visitUnaryExpr(Expr.Unary expr) {
-        Object right = evaluate(expr.right);
-        switch (expr.operator.type) {
-            case MINUS:
-                NumberCheck(expr.operator, right);
-                return -(double) right;
-            case BANG:
-
-                return !isTruth(right);
-        }
-        return null;
-    }
-
-    @Override
-    public Object visitVariableExpr(Expr.Variable expr) {
-
-        return lookUpVariable(expr.name, expr);
-    }
-    private Object lookUpVariable(Token name, Expr expr){
-        Integer dist = locals.get(expr);
-        if(dist!= null){
-            return environment.getAt(dist, name.lexeme);
-        }
-        return globals.get(name);
-    }
-
-
-    private boolean isTruth(Object obj) {
-        return switch (obj) {
-            case null -> false;
-            case Boolean b -> (boolean) obj;
-            case Double i -> (double) obj > 0;
-            default -> true;
-        };
-    }
-
-    private String stringify(Object object) {
-        if (object == null) return "nil";
-
-        if (object instanceof Double) {
-            String text = object.toString();
-            if (text.endsWith(".0")) {
-                text = text.substring(0, text.length() - 2);
-            }
-            return text;
-        }
-
-        return object.toString();
-    }
-
-    public void interpret(List<Stmt> tokens) {
+    void interpret(List<Stmt> statements) {
         try {
-            for (Stmt token : tokens) {
-                execute(token);
+            for (Stmt statement : statements) {
+                execute(statement);
             }
-        } catch (RuntimeError e) {
-            Jasper.runtimeError(e);
+        } catch (RuntimeError error) {
+            Jasper.runtimeError(error);
         }
     }
 
@@ -327,24 +121,45 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
         stmt.accept(this);
     }
 
+    void resolve(Expr expr, int depth) {
+        locals.put(expr, depth);
+    }
+
+    void executeBlock(List<Stmt> statements, Environment environment) {
+        Environment previous = this.environment;
+        try {
+            this.environment = environment;
+
+            for (Stmt statement : statements) {
+                execute(statement);
+            }
+        } finally {
+            this.environment = previous;
+        }
+    }
+
+    private Object evaluate(Expr expr) {
+        return expr.accept(this);
+    }
 
     @Override
     public Void visitBlockStmt(Stmt.Block stmt) {
         executeBlock(stmt.statements, new Environment(environment));
         return null;
     }
-    void executeBlock(List<Stmt> stmts, Environment env){
-        Environment prev = this.environment;
-        try{
-            this.environment = environment;
-            for(Stmt s : stmts){
-                execute(s);
-            }}
-        catch(Return returnvalue){
-                throw returnvalue;
-        }finally {
-            this.environment = prev;
+
+    @Override
+    public Void visitClassStmt(Stmt.Class stmt) {
+        environment.define(stmt.name.lexeme, null);
+        Map<String, Function> methods = new HashMap<>();
+        for (Stmt.Function method : stmt.methods) {
+            Function function = new Function(method, environment, method.name.lexeme.equals("init"));
+            methods.put(method.name.lexeme, function);
         }
+
+        JasperClass klass = new JasperClass(stmt.name.lexeme, methods);
+        environment.assign(stmt.name, klass);
+        return null;
     }
 
     @Override
@@ -354,36 +169,21 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
     }
 
     @Override
-    public Void visitClassStmt(Stmt.Class stmt) {
-        environment.define(stmt.name.lexeme, null);
-        Map<String, Function> methods = new HashMap<>();
-        for(Stmt.Function method : stmt.methods){
-            Function fun = new Function(method, environment,method.name.lexeme.equals("init"));
-            methods.put(method.name.lexeme, fun);
-        }
-        Class c = new Class(stmt.name.lexeme,methods);
-        environment.assign(stmt.name, c);
-        return  null;
-    }
-
-    @Override
     public Void visitFunctionStmt(Stmt.Function stmt) {
-        Function func = new Function(stmt,environment,false);
-        environment.define(stmt.name.lexeme, func);
+        Function function = new Function(stmt, environment, false);
+        environment.define(stmt.name.lexeme, function);
         return null;
-
     }
 
     @Override
     public Void visitIfStmt(Stmt.If stmt) {
-        if(isTruth(evaluate(stmt.condition))){
+        if (isTruthy(evaluate(stmt.condition))) {
             execute(stmt.then);
-        }else if(stmt.elseBranch!=null){
+        } else if (stmt.elseBranch != null) {
             execute(stmt.elseBranch);
         }
-        return  null;
+        return null;
     }
-
 
     @Override
     public Void visitPrintStmt(Stmt.Print stmt) {
@@ -394,9 +194,10 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
 
     @Override
     public Void visitReturnStmt(Stmt.Return stmt) {
-        Object val = null;
-        if(stmt.value != null) val = evaluate(stmt.value);
-        throw new Return(val);
+        Object value = null;
+        if (stmt.value != null) value = evaluate(stmt.value);
+
+        throw new Return(value);
     }
 
     @Override
@@ -412,10 +213,211 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
 
     @Override
     public Void visitWhileStmt(Stmt.While stmt) {
-        while(isTruth(evaluate(stmt.condition))){
+        while (isTruthy(evaluate(stmt.condition))) {
             execute(stmt.body);
         }
-        return  null;
+        return null;
     }
 
+    @Override
+    public Object visitAssignExpr(Expr.Assign expr) {
+        Object value = evaluate(expr.value);
+
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            environment.assignAt(distance, expr.name, value);
+        } else {
+            globals.assign(expr.name, value);
+        }
+
+        return value;
+    }
+
+    @Override
+    public Object visitBinaryExpr(Expr.Binary expr) {
+        Object left = evaluate(expr.left);
+        Object right = evaluate(expr.right);
+
+        switch (expr.operator.type) {
+            case BANG_EQUAL:
+                return !isEqual(left, right);
+            case EQUAL_EQUAL:
+                return isEqual(left, right);
+            case GREATER:
+                checkNumberOperands(expr.operator, left, right);
+                return (double)left > (double)right;
+            case GREATER_EQUAL:
+                checkNumberOperands(expr.operator, left, right);
+                return (double)left >= (double)right;
+            case LESS:
+                checkNumberOperands(expr.operator, left, right);
+                return (double)left < (double)right;
+            case LESS_EQUAL:
+                checkNumberOperands(expr.operator, left, right);
+                return (double)left <= (double)right;
+            case MINUS:
+                checkNumberOperands(expr.operator, left, right);
+                return (double)left - (double)right;
+            case PLUS:
+                if (left instanceof Double && right instanceof Double) {
+                    return (double)left + (double)right;
+                }
+
+                if (left instanceof String && right instanceof String) {
+                    return (String)left + (String)right;
+                }
+
+                throw new RuntimeError(expr.operator, "Operands must be two numbers or two strings.");
+            case SLASH:
+                checkNumberOperands(expr.operator, left, right);
+                return (double)left / (double)right;
+            case STAR:
+                checkNumberOperands(expr.operator, left, right);
+                return (double)left * (double)right;
+        }
+
+        // Unreachable.
+        return null;
+    }
+
+    @Override
+    public Object visitCallExpr(Expr.Call expr) {
+        Object callee = evaluate(expr.callee);
+
+        List<Object> arguments = new ArrayList<>();
+        for (Expr argument : expr.arguments) {
+            arguments.add(evaluate(argument));
+        }
+
+        if (!(callee instanceof JasperCallable)) {
+            throw new RuntimeError(expr.paren, "Can only call functions and classes.");
+        }
+
+        JasperCallable function = (JasperCallable)callee;
+        if (arguments.size() != function.arity()) {
+            throw new RuntimeError(expr.paren, "Expected " + function.arity() + " arguments but got " + arguments.size() + ".");
+        }
+
+        return function.call(this, arguments);
+    }
+
+    @Override
+    public Object visitGetExpr(Expr.Get expr) {
+        Object object = evaluate(expr.object);
+        if (object instanceof Instance) {
+            return ((Instance) object).get(expr.name);
+        }
+
+        throw new RuntimeError(expr.name, "Only instances have properties.");
+    }
+
+    @Override
+    public Object visitGroupingExpr(Expr.Grouping expr) {
+        return evaluate(expr.expression);
+    }
+
+    @Override
+    public Object visitLiteralExpr(Expr.Literal expr) {
+        return expr.value;
+    }
+
+    @Override
+    public Object visitLogicalExpr(Expr.Logical expr) {
+        Object left = evaluate(expr.left);
+
+        if (expr.operator.type == TokenType.OR) {
+            if (isTruthy(left)) return left;
+        } else {
+            if (!isTruthy(left)) return left;
+        }
+
+        return evaluate(expr.right);
+    }
+
+    @Override
+    public Object visitSetExpr(Expr.Set expr) {
+        Object object = evaluate(expr.object);
+
+        if (!(object instanceof Instance)) {
+            throw new RuntimeError(expr.name, "Only instances have fields.");
+        }
+
+        Object value = evaluate(expr.value);
+        ((Instance)object).set(expr.name, value);
+        return value;
+    }
+
+    @Override
+    public Object visitThisExpr(Expr.This expr) {
+        return lookUpVariable(expr.keyword, expr);
+    }
+
+    @Override
+    public Object visitUnaryExpr(Expr.Unary expr) {
+        Object right = evaluate(expr.right);
+
+        switch (expr.operator.type) {
+            case BANG:
+                return !isTruthy(right);
+            case MINUS:
+                checkNumberOperand(expr.operator, right);
+                return -(double)right;
+        }
+
+        // Unreachable.
+        return null;
+    }
+
+    @Override
+    public Object visitVariableExpr(Expr.Variable expr) {
+        return lookUpVariable(expr.name, expr);
+    }
+
+    private Object lookUpVariable(Token name, Expr expr) {
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            return environment.getAt(distance, name.lexeme);
+        } else {
+            return globals.get(name);
+        }
+    }
+
+    private void checkNumberOperand(Token operator, Object operand) {
+        if (operand instanceof Double) return;
+        throw new RuntimeError(operator, "Operand must be a number.");
+    }
+
+    private void checkNumberOperands(Token operator, Object left, Object right) {
+        if (left instanceof Double && right instanceof Double) return;
+        throw new RuntimeError(operator, "Operands must be numbers.");
+    }
+
+    private boolean isTruthy(Object object) {
+        if (object == null) return false;
+        if (object instanceof Boolean) return (boolean)object;
+        return true;
+    }
+
+    private boolean isEqual(Object a, Object b) {
+        // nil is only equal to nil.
+        if (a == null && b == null) return true;
+        if (a == null) return false;
+
+        return a.equals(b);
+    }
+
+    private String stringify(Object object) {
+        if (object == null) return "nil";
+
+        // Hack. Work around Java adding ".0" to integer-valued doubles.
+        if (object instanceof Double) {
+            String text = object.toString();
+            if (text.endsWith(".0")) {
+                text = text.substring(0, text.length() - 2);
+            }
+            return text;
+        }
+
+        return object.toString();
+    }
 }

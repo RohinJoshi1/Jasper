@@ -48,6 +48,9 @@ public class Jasper {
     private static void run(String source) {
         Scanner sc = new Scanner(source);
         List<Token> tokens = sc.scanTokens();
+//        for(Token t : tokens){
+//            System.out.println(t.lexeme);
+//        }
         Parser parser = new Parser(tokens);
         List<Stmt> statements = parser.parse();
         if(hadError)return;

@@ -1,5 +1,4 @@
 package jasper;
-import java.rmi.server.RemoteObjectInvocationHandler;
 import java.util.*;
 
 import static jasper.TokenType.*;
@@ -7,7 +6,7 @@ import static jasper.TokenType.*;
 /*
 * GRAMMAR RULES
 * expression -> assignment;
-* assignment    →  IDENTIFIER "=" assignment |equality ;
+* assignment    →  (call ".")?IDENTIFIER "=" assignment | OR  ;
 * OR -> AND ( "or" AND)*;
 * AND -> EQUALITY ("AND" EQUALITY)*;
 equality       → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -15,12 +14,13 @@ comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           → factor ( ( "-" | "+" ) factor )* ;
 factor         → unary ( ( "/" | "*" ) unary )* ;
 unary          → ( "!" | "-" ) unary | call;
-call           -> primary ( "(" args ? ")" ) *
+call           -> primary ( "(" args ? ")"  | "." IDENTIFIER )* ;
 args -> expression ( "," expression)*;
 primary        → NUMBER | STRING | "true" | "false" | "nil"
                | "(" expression ")" | IDENTIFIER;
 program -> (declaration)* EOF;
-* declaration -> varDecl | statement | funcDecl;
+* declaration -> varDecl | statement | funcDecl | classDecl;
+* classDecl -> "class" + IDENTIFIER + "{" + function* + "}"
 * funcDecl        → "fun" function ;
 function       → IDENTIFIER "(" parameters? ")" block ;
 * statement -> (printStmt | ifStmt | expressionStmt | block | whileStmt | forStmt | returnStmt);
@@ -53,6 +53,7 @@ public class Parser {
     }
     private Stmt declaration(){
         try{
+            if(match(CLASS)) return classDecl();
             if(match(FUNC))return function("function");
             if(match(VAR))return varDeclaration();
             return statement();
@@ -61,7 +62,18 @@ public class Parser {
             return null;
         }
     }
-    private Stmt function(String kind){
+//    classDecl -> "class" + IDENTIFIER + "{" + function* + "}"
+    private Stmt.Class classDecl(){
+        Token name = consume(IDENTIFIER, "Class name expected");
+        consume(LEFT_BRACE,"Opening '{' expected");
+        List<Stmt.Function> methods = new ArrayList<>();
+        while(!isAtEnd() && !check(RIGHT_PAREN)){
+            methods.add(this.function("method"));
+        }
+        consume(RIGHT_PAREN , "Closing } expected after class declaration");
+        return new Stmt.Class(name, methods);
+    }
+    private Stmt.Function function(String kind){
         Token name = consume(IDENTIFIER, "Expect " + kind + "name");
         //Get params
         consume(LEFT_PAREN, "Expect '(' after "+ kind + "name");
@@ -89,7 +101,6 @@ public class Parser {
         return new Stmt.Var(name, initializer);
     }
 
-
     private Expr expression(){
         return assignment();
      }
@@ -102,6 +113,9 @@ public class Parser {
             if (expr instanceof Expr.Variable){
                 Token name = ((Expr.Variable)expr).name;
                 return new Expr.Assign(name, value);
+            }else if(expr instanceof Expr.Get){
+                Expr.Get get  = (Expr.Get)expr;
+                return new Expr.Set(get.object, get.name, value);
             }
             ParseError error = error(equals, "Invalid assignment target.");
         }
@@ -268,7 +282,11 @@ public class Parser {
         while(true){
             if(match(LEFT_PAREN)){
                 expr = processCall(expr);
-            }else break;
+            }else if(match(DOT)){
+                Token name = consume(IDENTIFIER, "Expected property name after '.'");
+                expr = new Expr.Get(expr, name);
+            }
+            else break;
         }
         return  expr;
     }
@@ -290,6 +308,9 @@ public class Parser {
     private Expr primary(){
         if(match(NUMBER, STRING)){
             return new Expr.Literal(previous().literal);
+        }
+        if(match(THIS)){
+            return new Expr.This(previous());
         }
         if(match(FALSE)) return  new Expr.Literal(false);
         if(match(TRUE)) return  new Expr.Literal(true);

@@ -1,5 +1,6 @@
 package jasper;
 
+import javax.management.RuntimeErrorException;
 import java.io.*;
 import java.sql.Statement;
 import java.util.*;
@@ -192,6 +193,32 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
 
     }
 
+    @Override
+    public Object visitGetExpr(Expr.Get expr) {
+        Object object = evaluate(expr.object);
+        if((object instanceof Instance)){
+           return ((Instance)object).get(expr.name);
+        }
+        throw new RuntimeError(expr.name, " Only instances have properties");
+    }
+
+    @Override
+    public Object visitSetExpr(Expr.Set expr) {
+        Object object = evaluate(expr.object);
+        if(!(object instanceof Instance)){
+            throw new RuntimeError(expr.name, "Only instances have fields");
+        }
+        Object value = evaluate(expr.value);
+        ((Instance)object).set(expr.name, value);
+        return value;
+
+    }
+
+    @Override
+    public Object visitThisExpr(Expr.This expr) {
+        return lookUpVariable(expr.keyword, expr);
+    }
+
     private boolean isEqual(Object a, Object b) {
         if (a == null && b == null) return true;
         if (a == null) return false;
@@ -327,8 +354,21 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitClassStmt(Stmt.Class stmt) {
+        environment.define(stmt.name.lexeme, null);
+        Map<String, Function> methods = new HashMap<>();
+        for(Stmt.Function method : stmt.methods){
+            Function fun = new Function(method, environment,method.name.lexeme.equals("init"));
+            methods.put(method.name.lexeme, fun);
+        }
+        Class c = new Class(stmt.name.lexeme,methods);
+        environment.assign(stmt.name, c);
+        return  null;
+    }
+
+    @Override
     public Void visitFunctionStmt(Stmt.Function stmt) {
-        Function func = new Function(stmt,environment);
+        Function func = new Function(stmt,environment,false);
         environment.define(stmt.name.lexeme, func);
         return null;
 

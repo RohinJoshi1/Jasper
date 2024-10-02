@@ -150,15 +150,31 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
 
     @Override
     public Void visitClassStmt(Stmt.Class stmt) {
+        Object superclass = null;
+        if(stmt.superclass!=null){
+            superclass = evaluate(stmt.superclass);
+            if(!(superclass instanceof JasperClass)){
+                throw  new RuntimeError(stmt.superclass.name,"Superclass must be a class");
+            }
+
+        }
         environment.define(stmt.name.lexeme, null);
+        if(stmt.superclass!=null){
+            environment = new Environment(environment);
+            environment.define("super",superclass);
+        }
         Map<String, Function> methods = new HashMap<>();
+
         for (Stmt.Function method : stmt.methods) {
             Function function = new Function(method, environment, method.name.lexeme.equals("init"));
             methods.put(method.name.lexeme, function);
         }
 
-        JasperClass klass = new JasperClass(stmt.name.lexeme, methods);
-        environment.assign(stmt.name, klass);
+        JasperClass c = new JasperClass(stmt.name.lexeme,(JasperClass)superclass,  methods);
+        if(superclass!=null){
+            environment = environment.enclosing;
+        }
+        environment.assign(stmt.name, c);
         return null;
     }
 
@@ -294,7 +310,7 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
         }
 
         JasperCallable function = (JasperCallable)callee;
-        if (arguments.size() != function.arity()) {
+        if (function.arity()!=-1 && arguments.size() != function.arity()) {
             throw new RuntimeError(expr.paren, "Expected " + function.arity() + " arguments but got " + arguments.size() + ".");
         }
 
@@ -345,6 +361,19 @@ public class Interpreter implements  Expr.Visitor<Object> , Stmt.Visitor<Void> {
         Object value = evaluate(expr.value);
         ((Instance)object).set(expr.name, value);
         return value;
+    }
+
+    @Override
+    public Object visitSuperExpr(Expr.Super expr) {
+        int distance = locals.get(expr);
+        JasperClass supercls = (JasperClass)environment.getAt(distance, "super");
+        Instance obj = (Instance) environment.getAt(distance-1, "this");
+        Function method = supercls.getMethod(obj, expr.method.lexeme);
+        if (method == null) {
+            throw new RuntimeError(expr.method,
+                    "Undefined property '" + expr.method.lexeme + "'.");
+        }
+        return method.bind(obj);
     }
 
     @Override

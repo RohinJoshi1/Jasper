@@ -15,7 +15,8 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
     private enum ClassType{
         NONE,
-        CLASS
+        CLASS,
+        SUBCLASS
     }
     public Resolver(Interpreter interpreter) {
         this.interpreter = interpreter;
@@ -40,6 +41,15 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         currentClass = ClassType.CLASS;
         declare(stmt.name);
         define(stmt.name);
+        if(stmt.superclass != null && stmt.superclass.name.lexeme.equals(stmt.name.lexeme)){
+            Jasper.error(stmt.superclass.name , "Inheritance cycle detected, cannot inherit from same class");
+        }
+        if(stmt.superclass!=null){
+            currentClass = ClassType.SUBCLASS;
+            resolve(stmt.superclass);
+            beginScope();
+            scopes.peek().put("super",true);
+        }
         beginScope();
         scopes.peek().put("this", true);
         for(Stmt.Function method : stmt.methods){
@@ -50,6 +60,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
             resolveFunction(method, declaration);
         }
         endScope();
+        if(stmt.superclass!=null)endScope();
         currentClass = enclosingClass;
         return  null;
     }
@@ -191,6 +202,18 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         resolve(expr.value);
         resolve(expr.object);
         return  null;
+    }
+
+    @Override
+    public Void visitSuperExpr(Expr.Super expr) {
+        if(currentClass == ClassType.NONE){
+            Jasper.error(expr.keyword, "Super keyword cannot be used outside a class");
+        }else if(currentClass == ClassType.CLASS){
+            Jasper.error(expr.keyword, "No parent found for class while using 'super'");
+        }
+
+        resolveLocal(expr,expr.keyword);
+        return null;
     }
 
     @Override

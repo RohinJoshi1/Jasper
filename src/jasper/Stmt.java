@@ -39,8 +39,9 @@ abstract class Stmt{
     final Expr expression;
   }
  static class Class extends Stmt {
-    Class(Token name, List<Stmt.Function> methods) {
+    Class(Token name, Expr.Variable superclass, List<Stmt.Function> methods) {
       this.name = name;
+      this.superclass = superclass;
       this.methods = methods;
     }
 
@@ -50,12 +51,13 @@ abstract class Stmt{
     }
 
     final Token name;
+    final Expr.Variable superclass;
     final List<Stmt.Function> methods;
   }
  static class Function extends Stmt {
-    Function(Token name, List<Token> params, List<Stmt> body) {
+    Function(Token name, List<Token> parameters, List<Stmt> body) {
       this.name = name;
-      this.parameters = params;
+      this.parameters = parameters;
       this.body = body;
     }
 

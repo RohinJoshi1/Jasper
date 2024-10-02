@@ -2,9 +2,11 @@ package jasper;
 import java.util.*;
 public class JasperClass implements JasperCallable{
     final String name;
+    final JasperClass superclass;
     private final Map<String, Function> methods;
-    JasperClass(String name, Map<String, Function> methods){
+    JasperClass(String name, JasperClass superclass, Map<String, Function> methods){
         this.name = name;
+        this.superclass = superclass;
         this.methods = methods;
     }
     @Override
@@ -31,6 +33,9 @@ public class JasperClass implements JasperCallable{
     Function getMethod(Instance instance, String name){
         if(methods.containsKey(name)){
             return methods.get(name).bind(instance);
+        }
+        if(superclass != null){
+            return superclass.getMethod(instance, name);
         }
         return  null;
     }

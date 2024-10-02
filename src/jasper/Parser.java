@@ -17,10 +17,10 @@ unary          → ( "!" | "-" ) unary | call;
 call           -> primary ( "(" args ? ")"  | "." IDENTIFIER )* ;
 args -> expression ( "," expression)*;
 primary        → NUMBER | STRING | "true" | "false" | "nil"
-               | "(" expression ")" | IDENTIFIER;
+               | "(" expression ")" | IDENTIFIER | "super" "." IDENTIFIER;
 program -> (declaration)* EOF;
 * declaration -> varDecl | statement | funcDecl | classDecl;
-* classDecl -> "class" + IDENTIFIER + "{" + function* + "}"
+* classDecl -> "class" + IDENTIFIER ("<" IDENTIFIER)* + "{" + function* + "}"
 * funcDecl        → "fun" function ;
 function       → IDENTIFIER "(" parameters? ")" block ;
 * statement -> (printStmt | ifStmt | expressionStmt | block | whileStmt | forStmt | returnStmt);
@@ -71,6 +71,11 @@ class Parser {
 
     private Stmt classDeclaration() {
         Token name = consume(IDENTIFIER, "Expect class name.");
+        Expr.Variable superclass = null;
+        if(match(LESS)){
+            consume(IDENTIFIER, "Expect superclass name");
+            superclass = new Expr.Variable(previous());
+        }
         consume(LEFT_BRACE, "Expect '{' before class body.");
 
         List<Stmt.Function> methods = new ArrayList<>();
@@ -80,7 +85,7 @@ class Parser {
 
         consume(RIGHT_BRACE, "Expect '}' after class body.");
 
-        return new Stmt.Class(name, methods);
+        return new Stmt.Class(name,superclass,  methods);
     }
 
     private Stmt statement() {
@@ -371,7 +376,12 @@ class Parser {
         if (match(FALSE)) return new Expr.Literal(false);
         if (match(TRUE)) return new Expr.Literal(true);
         if (match(NIL)) return new Expr.Literal(null);
-
+        if(match(SUPER)) {
+            Token keyword = previous();
+            consume(DOT, "Expect '.' after super");
+            Token method = consume(IDENTIFIER, "Expect method name after 'super.'");
+            return new Expr.Super(keyword, method);
+        }
         if (match(NUMBER, STRING)) {
             return new Expr.Literal(previous().literal);
         }

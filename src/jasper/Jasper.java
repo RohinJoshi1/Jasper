@@ -18,6 +18,11 @@ public class Jasper {
             return;
         }
         if(args.length > 1){
+            String[] file = (args[1].split("\\."));
+            if(!file[1].equals("jasp")) {
+                System.out.println("Filename should end with .jasp");
+                return;
+            }
             runFile(args[1]);
             System.exit(64);
         }else if(args.length == 1){

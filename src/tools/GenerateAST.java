@@ -15,6 +15,10 @@ public class GenerateAST {
                 "Assign : Token name, Expr value",
                 "Binary   : Expr left, Token operator, Expr right",
                 "Call : Expr callee , Token paren , List<Expr> arguments",
+                "Get : Expr object, Token name",
+                "Set: Expr object, Token name, Expr value",
+                "Super: Token keyword, Token method",
+                "This : Token keyword",
                 "Grouping : Expr expression",
                 "Literal  : Object value",
                 "Logical  : Expr left, Token operator, Expr right",
@@ -24,7 +28,8 @@ public class GenerateAST {
         defineAst(outDir, "Stmt", Arrays.asList(
                 "Block: List<Stmt> statements",
                 "Expression : Expr expression",
-                "Function   : Token name, List<Token> params," +
+                "Class : Token name, Expr.Variable superclass," + " List<Stmt.Function> methods",
+                "Function   : Token name, List<Token> parameters," +
                         " List<Stmt> body",
                 "If         : Expr condition, Stmt then," + " Stmt elseBranch",
                 "Print      : Expr expression",

@@ -1,19 +1,103 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Documentation</title>
-  <link rel="stylesheet" href="//unpkg.com/docsify/themes/vue.css">
+  <title>Project Documentation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app"></div>
   <script>
     window.$docsify = {
-      name: 'NMDC',
+      name: 'Project Name',
+      repo: 'username/repo',
       loadSidebar: true,
+      loadNavbar: true,
+      coverpage: true,
+      maxLevel: 4,
+      subMaxLevel: 2,
       auto2top: true,
+      search: {
+        maxAge: 86400000,
+        paths: 'auto',
+        placeholder: 'Search',
+        noData: 'No Results',
+        depth: 6
+      },
+      plugins: [
+        function(hook, vm) {
+          hook.beforeEach(function(content) {
+            // Parse XML metadata here
+            return content;
+          });
+        }
+      ]
     }
   </script>
-  <script src="//unpkg.com/docsify/lib/docsify.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify@4"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-bash.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-javascript.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-xml.min.js"></script>
 </body>
 </html>
+
+<!-- _sidebar.md -->
+- Getting Started
+  - [Overview](/)
+  - [Installation](guides/installation.md)
+  - [Configuration](guides/configuration.md)
+- API Reference
+  - [Overview](api/overview.md)
+  - [Endpoints](api/endpoints.md)
+  - [Examples](api/examples.md)
+
+<!-- _navbar.md -->
+- [Home](/)
+- [API Reference](api/overview.md)
+- [GitHub](https://github.com/username/repo/)
+
+<!-- _coverpage.md -->
+# Project Name <small>1.0</small>
+
+> A magical documentation site generator.
+
+- Simple and lightweight
+- No statically built html files
+- Multiple themes
+
+[GitHub](https://github.com/username/repo/)
+[Get Started](#main)
+
+<!-- style.css -->
+:root {
+  --theme-color: #42b983;
+}
+
+.markdown-section {
+  max-width: 850px;
+}
+
+.xml-metadata {
+  background: #f8f8f8;
+  border-left: 4px solid var(--theme-color);
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.parameter {
+  margin: 0.5rem 0;
+}
+
+.parameter-name {
+  color: #e96900;
+  font-weight: bold;
+}
+
+.parameter-type {
+  color: #8492a6;
+  margin-left: 0.5rem;
+}

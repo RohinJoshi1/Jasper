@@ -1,4 +1,3 @@
-Here’s the content formatted as a `.md` file for your README:
 
 ```markdown
 # Scopes Programming Language

@@ -1,3 +1,9 @@
-print "enter input";
-var x = input();
-print x;
+func calculateInterest( p , r , t ) {
+    var x= p*r*t / 100;
+    return x;
+}
+while(true){
+    print "aosijoafsj";
+}
+
+
